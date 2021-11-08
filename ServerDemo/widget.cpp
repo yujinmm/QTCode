@@ -25,8 +25,21 @@ Widget::Widget(QWidget *parent)
                     QString temp = QString("[%1;%2]:成功连接").arg(ip).arg(port);
 
                     ui->MessageWindow->setText(temp);
+
+                    //取出指针后在对其进行操作
+                    connect(tcpSocket, &QTcpSocket::readyRead,
+                                [=]()
+                                {
+                                    //从通信套接字取出内容,与自己软件对接失败
+                                    QByteArray array = tcpSocket->readAll();
+                                    ui->MessageWindow->append(array);
+
+                                }
+
+                            );
                 }
             );
+
 }
 
 Widget::~Widget()
