@@ -21,6 +21,8 @@ public:
 private slots:
     void on_SendButton_clicked();
 
+    void on_CloseButton_clicked();
+
 private:
     Ui::Widget *ui;
 

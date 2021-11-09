@@ -7,6 +7,9 @@ Widget::Widget(QWidget *parent)
 {
     ui->setupUi(this);
 
+    tcpServer = NULL;
+    tcpSocket = NULL;
+
     //监听套接字
     tcpServer = new QTcpServer(this);
     //绑定当前网卡所有IP地址
@@ -50,6 +53,10 @@ Widget::~Widget()
 
 void Widget::on_SendButton_clicked()
 {
+    if(tcpSocket == NULL)
+    {
+        return;
+    }
     //获取编辑区内容
     QString str = ui->InputWindow->toPlainText();
     //给对方发送数据，使用通信套接字tcpSoket, 把QString转换成char*数组
@@ -57,4 +64,16 @@ void Widget::on_SendButton_clicked()
     tcpSocket->write( str.toLocal8Bit().data() );
     //无法与ASCII码对接上
 //    tcpSocket->write( str.toUtf8().data() );
+}
+
+void Widget::on_CloseButton_clicked()
+{
+    if(tcpSocket == NULL)
+    {
+        return;
+    }
+    //主动与客户端端口断开连接
+    tcpSocket->disconnectFromHost();
+    tcpSocket->close();
+    tcpSocket = NULL;
 }
