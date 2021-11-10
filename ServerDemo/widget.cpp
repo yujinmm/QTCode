@@ -50,7 +50,6 @@ Widget::~Widget()
     delete ui;
 }
 
-
 void Widget::on_SendButton_clicked()
 {
     if(tcpSocket == NULL)
