@@ -25,7 +25,7 @@ ClientWidget::ClientWidget(QWidget *parent) :
                 //获取对方发送的内容
                 QByteArray array = tcpSocket->readAll();
                 //追加到编辑区中
-                ui->Message_Window->append(array);
+                ui->Message_Window->append(array.toHex());
            }
            );
 }
