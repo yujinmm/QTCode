@@ -90,7 +90,7 @@ Widget::Widget(QWidget *parent)
 
 
     connect(&timerPacketSend, &QTimer::timeout,
-            [=]()
+            [this]()
             {
                 static quint16 countNUM_1 = 1;
 
@@ -279,9 +279,6 @@ void Widget::on_Select_PBT_clicked()
         file.close();
     }
 
-
-
-    //对文件原始数据进行分包
 
 }
 
