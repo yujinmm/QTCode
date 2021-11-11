@@ -35,6 +35,8 @@ public:
     Widget(QWidget *parent = nullptr);
     ~Widget();
 
+
+
 private slots:
     void on_Connect_PBT_clicked();
 
@@ -55,7 +57,7 @@ private:
     quint64 fileSize;//文件大小
     quint64 sendSize;//已经发送文件的大小
 
-    char* fileAllbuf;//文件原始数据
+    char fileAllbuf[50000];//文件原始数据
 
     //分包参数
     qint16 packetNum;

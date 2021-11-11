@@ -92,33 +92,89 @@ Widget::Widget(QWidget *parent)
     connect(&timerPacketSend, &QTimer::timeout,
             [=]()
             {
-                if( YgetC_flag == 1 && YgetACK_flag == 1)
+                static quint16 countNUM_1 = 1;
+
+                if( YgetACK_flag == 1 && countNUM_1 <= packetNum)
                 {
-                    ui->Messages_QTE->append("发送第二包数据");
-                    timerPacketSend.stop();
+                    ui->Messages_QTE->append(QString("发送第%1包数据").arg(countNUM_1));
+
                     dataFrame[0] = Ymodem_STX;
-                    dataFrame[1] = (char)0x01;
-                    dataFrame[2] = (char)0xFE;
+                    dataFrame[1] = (char)(0x00 + countNUM_1);
+                    dataFrame[2] = (char)(0xFF - countNUM_1);
 
-//                    for(int i = 0; i < 1024; i++)
-//                    {
-//                        dataFrame[3+i] = fileAllbuf[i];
-//                    }
-//                    memcpy(dataFrame+3, fileAllbuf, 1024);
+                    //判断当前发送的是否是最后一包数据
+                    if( countNUM_1 == packetNum )
+                    {
+                        //写入剩余数据
+                        for(int i = 0; i < lastpacketSize; i++)
+                        {
+                            dataFrame[3+i] = fileAllbuf[(countNUM_1-1)*1024+i];
+                        }
+                        //不足1024的部分用0x1A填充
+                        for(int i = 0; i < ( 1024-lastpacketSize ); i++)
+                        {
+                            dataFrame[3+lastpacketSize+i] = 0x1A;
+                        }
+                    }
+                    else
+                    {
+                        for(int i = 0; i < 1024; i++)
+                        {
+                            dataFrame[3+i] = fileAllbuf[(countNUM_1-1)*1024+i];
+                        }
+                    }
 
-//                    //计算CRC
-//                    width_t crc16 = 0;
-//                    crc16 = crcCompute((unsigned char *)dataFrame+3,1024);
-//                    qDebug()<<crc16;
+                    //计算CRC
+                    width_t crc16 = 0;
+                    crc16 = crcCompute((unsigned char *)dataFrame+3,1024);
+                    //                        qDebug()<<crc16;
 
-//                    //写入CRC并发送
-//                    dataFrame[1027] = crc16 >> 8;
-//                    dataFrame[1028] = crc16;
-//                    tcpSocket->write(dataFrame, 1029);
+                    //写入CRC并发送
+                    dataFrame[1027] = crc16 >> 8;
+                    dataFrame[1028] = crc16;
+                    tcpSocket->write(dataFrame, 1029);
 
-//                    YgetC_flag = 0;
-//                    YgetACK_flag = 0;
+                    YgetC_flag = 0;
+                    YgetACK_flag = 0;
+                    countNUM_1 ++;
+
                 }
+                if( countNUM_1 == (packetNum + 1) )
+                {
+                    static quint16 countNUM_2 = 1;
+                    if( YgetACK_flag == 1 && countNUM_2 <= 2 )
+                    {
+                        char tempt = Ymodem_EOT;
+                        tcpSocket->write(&tempt,1);
+                        YgetACK_flag = 0;
+                        countNUM_2 ++;
+                    }
+                    if( YgetACK_flag == 1 && countNUM_2 == 3 )
+                    {
+                        stopFrame[0] = Ymodem_SOH;
+                        stopFrame[1] = 0x00;
+                        stopFrame[2] = 0xFF;
+                        for(int i = 0; i < 128; i++)
+                        {
+                            stopFrame[3+i] = 0x00;
+                        }
+                        //计算CRC
+                        width_t crc16 = 0;
+                        crc16 = crcCompute((unsigned char *)stopFrame+3,128);
+                        //                        qDebug()<<crc16;
+
+                        //写入CRC并发送
+                        stopFrame[131] = crc16 >> 8;
+                        stopFrame[132] = crc16;
+                        tcpSocket->write(stopFrame, 133);
+                        countNUM_1 = 1;
+                        countNUM_2 = 1;
+
+                        YgetACK_flag = 0;
+                    }
+                }
+
+
             }
             );
 
@@ -186,7 +242,6 @@ void Widget::on_Select_PBT_clicked()
         ui->Send_PBT->setEnabled(true);
 
         QDataStream dataStream(&file);
-        char *fileAllbuf = new char[fileSize];
 
         memset(fileAllbuf, 0, fileSize);
         dataStream.readRawData(fileAllbuf, fileSize);
@@ -195,9 +250,10 @@ void Widget::on_Select_PBT_clicked()
         QString strALL;
         for(quint64 i = 0; i < fileSize; i++)
         {
-            strALL += QString::asprintf("%02X",(uint8_t)fileAllbuf[i]);
+            strALL += QString::asprintf("%02X ",(uint8_t)fileAllbuf[i]);
         }
         qDebug()<<strALL;
+
 
         packetNum = fileSize/packetSize + 1;
         lastpacketSize = fileSize%packetSize;
@@ -264,7 +320,6 @@ void Widget::on_Send_PBT_clicked()
     timerPacketSend.start(100);
 
 }
-
 
 static unsigned short crcTable[256] =
 {
