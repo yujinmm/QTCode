@@ -99,6 +99,7 @@ Widget::Widget(QWidget *parent)
                     dataFrame[0] = Ymodem_STX;
                     dataFrame[1] = (char)0x01;
                     dataFrame[2] = (char)0xFE;
+dataFrame[3] = fileAllbuf[0];
 
 //                    for(int i = 0; i < 1024; i++)
 //                    {
