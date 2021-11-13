@@ -190,7 +190,7 @@ Widget::Widget(QWidget *parent)
                     stopFrame[2] = 0xFF;
                     for(int i = 0; i < 128; i++)
                     {
-                        stopFrame[3+i] = 0x00;
+                        stopFrame[3+i] = 0x1A;
                     }
                     //计算CRC
                     width_t crc16 = 0;
