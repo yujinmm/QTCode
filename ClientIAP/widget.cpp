@@ -12,12 +12,18 @@ Widget::Widget(QWidget *parent)
     , ui(new Ui::Widget)
 {
     ui->setupUi(this);
+    this->setFixedSize(450,409);
 
     //初始化CRC
     crcInit();
 
     //防止野指针
     tcpSocket = NULL;
+
+    //.bin文件发送阶段，初始化为
+    dataSendstage = 1;
+    //默认位顶层模式
+    devstage = 1;
 
     //两个按钮都不能按
     ui->Select_PBT->setEnabled(false);
@@ -26,8 +32,6 @@ Widget::Widget(QWidget *parent)
     //接收到Ymodem协议后置位
     YgetC_flag = 0;
     YgetACK_flag = 0;
-    fileRead_flag = 0;
-    sending_flag = 0;
 
     //分包参数
     packetNum = 0;
@@ -40,19 +44,26 @@ Widget::Widget(QWidget *parent)
            {
                 ui->Messages_QTE->append("成功与服务器建立好连接!");
                 ui->Select_PBT->setEnabled(true);
-                timer.start(3000);
+                ui->label_State->setText("已连接");
+                //当网络连接状态更改，需要初始化.bin文件发送的标志位
+                dataSendstage = 1;
+                YgetC_flag = 0;
+                YgetACK_flag = 0;
            }
            );
 
     connect(tcpSocket, &QTcpSocket::disconnected,
            [=]()
            {
+                //这里还存在一个问题，就是没有手动断开连接，当窗口关闭后 对象树释放socket后断开连接，还会进来一次，这是就会报错
                 ui->Messages_QTE->append("与服务器断开连接!");
                 ui->Select_PBT->setEnabled(false);
-
+                ui->label_State->setText("未连接");
+                ui->label_DevS->setText("下位机当前状态");
+                //当网络连接状态更改，需要初始化.bin文件发送的标志位
+                dataSendstage = 1;
                 YgetC_flag = 0;
                 YgetACK_flag = 0;
-                timer.stop();
            }
            );
 
@@ -62,13 +73,59 @@ Widget::Widget(QWidget *parent)
                 //获取对方发送的内容
                 QByteArray array = tcpSocket->readAll();
                 //追加到编辑区中
-                ui->Messages_QTE->append(array.toHex());
+                ui->revMessage_QTE->append(array.toHex());
 
                 if(array.size() == 1)
                 {
-                    if( array.at(0) == Ymodem_C ) YgetC_flag = 1;
-                    if( array.at(0) == Ymodem_ACK ) YgetACK_flag = 1;
+                    if( array.at(0) == Ymodem_Configure )
+                    {
+                        ui->label_DevS->setText("顶层模式");
+                        devstage = 1;
+                    }
+                    else if( array.at(0) == Ymodem_Setting )
+                    {
+                        ui->label_DevS->setText("配置修改模式");
+                        devstage = 2;
+                    }
+                    else if( array.at(0) == Ymodem_C )
+                    {
+                        YgetC_flag = 1;
+                        ui->label_DevS->setText("固件升级模式");
+                        devstage = 3;
+                    }
+                    else if( array.at(0) == Ymodem_ACK )
+                    {
+                        YgetACK_flag = 1;
+                    }
+                }//对14字节的命令帧数据进行接收
+                else if( array.size() == 14 )
+                {
+                    for( int i = 0; i < 14; i++ )
+                    {
+                        commandRXframe[i] = array.at(i);
+                    }
+                    if(commandRXframe[0] == 0x01 && commandRXframe[1] == 0xAB && commandRXframe[2] == 0xCD && commandRXframe[3] == 0x05 )
+                    {
+                        //去掉帧首，对8字节有效数据，进行校验CRC校验
+                        if( crcCompute(&commandRXframe[4],8) == (commandRXframe[12]<<8 |commandRXframe[13]) )
+                        {
+                            local_ip[2] = commandRXframe[6];
+                            local_ip[3] = commandRXframe[7];
+
+                            gateway[2] = commandRXframe[8];
+                            gateway[3] =  commandRXframe[9];
+
+                            mac[4] = commandRXframe[10];
+                            mac[5] = commandRXframe[11];
+
+                            ui->Dev_IP->setText(QString("%1.%2.%3.%4").arg(local_ip[0]).arg(local_ip[1]).arg(local_ip[2]).arg(local_ip[3]));
+                            ui->Dev_Gateway->setText(QString("%1.%2.%3.%4").arg(gateway[0]).arg(gateway[1]).arg(gateway[2]).arg(gateway[3]));
+                            ui->Dev_Mac->setText(QString("%1.%2.%3.%4.%5.%6").arg(mac[0]).arg(mac[1]).arg(mac[2]).arg(mac[3]).arg(mac[4]).arg(mac[5]));
+                        }
+                    }
+
                 }
+
            }
            );
 
@@ -92,9 +149,6 @@ Widget::Widget(QWidget *parent)
     connect(&timerPacketSend, &QTimer::timeout,
             [this]()
             {
-                //数据发送阶段标志位
-                static quint16 dataSendstage = 1;
-
                 //首帧发送阶段
                 if( YgetC_flag == 1 && dataSendstage == 1 )
                 {
@@ -102,10 +156,11 @@ Widget::Widget(QWidget *parent)
                     startFrame[1] = 0x00;
                     startFrame[2] = 0xFF;
 
-                    //将QString转换成字符数组char[];
+                    //将文件名称以及文件大小数据填充到首帧.START
+                    //将QString转换成字符数组char[],以ASCII形式发送;
                     memcpy(startFrame+3, fileName.toLatin1().data(), fileName.size()+1);
 
-                    //文件大小，占据8字节，
+                    //文件大小，占据8字节，以quint64形式，保存文件大小XXXXBytes
                     *(quint64*)(&startFrame[3+fileName.size()+1]) = fileSize;
                     qDebug()<<*(quint64*)(&startFrame[3+fileName.size()+1]);
 
@@ -115,6 +170,7 @@ Widget::Widget(QWidget *parent)
                     {
                         startFrame[3+fileName.size()+1+8+i] = 0x00;
                     }
+                    //将文件名称以及文件大小数据填充到首帧.END
 
                     //计算CRC
                     width_t crc16;
@@ -205,14 +261,11 @@ Widget::Widget(QWidget *parent)
                     dataSendstage = 1;
                     YgetACK_flag = 0;
                     YgetC_flag = 0;
-                }
+                    timerPacketSend.stop();
 
+                }
             }
            );
-
-    //关闭窗口的后，关闭通信套接字
-    connect(this, &Widget::destroyed, tcpSocket, &QTcpSocket::close);
-
 }
 
 Widget::~Widget()
@@ -223,20 +276,34 @@ Widget::~Widget()
 
 void Widget::on_Connect_PBT_clicked()
 {
-    //获取服务器ip和端口
-    QString ip = ui->IP_IE->text();
-    //将Qstring 转换成 int
-    quint16 Port = ui->Port_IE->text().toUInt();
+    if( tcpSocket->state() == QAbstractSocket::UnconnectedState )
+    {   //获取服务器ip和端口
+        QString ip = ui->IP_IE->text();
+        //将Qstring 转换成 int
+        quint16 Port = ui->Port_IE->text().toUInt();
 
-    //主动和服务器建立
-    tcpSocket->connectToHost(QHostAddress(ip),Port);
+        //主动和服务器建立
+        tcpSocket->connectToHost(QHostAddress(ip),Port);
+    }
+    else
+    {
+        ui->Messages_QTE->append(QString("网络状态:%1").arg(tcpSocket->state()));
+
+    }
 }
 
 void Widget::on_Close_PBT_clicked()
 {
-    //主动和对方断开
-    tcpSocket->disconnectFromHost();
-    tcpSocket->close();
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        //主动和对方断开
+        tcpSocket->disconnectFromHost();
+        tcpSocket->close();
+    }
+    else
+    {
+        ui->Messages_QTE->append(QString("网络状态:%1").arg(tcpSocket->state()));
+    }
 }
 
 void Widget::on_Select_PBT_clicked()
@@ -254,7 +321,6 @@ void Widget::on_Select_PBT_clicked()
         fileSize = info.size();
 
         qDebug() << fileName <<fileSize;
-        sendSize = 0;
 
         //只读方式打开文件
         //指定文件的名字
@@ -264,20 +330,19 @@ void Widget::on_Select_PBT_clicked()
         bool isOK = file.open(QIODevice::ReadOnly);
         if(isOK == false)
         {
-            qDebug() << "只读方式打开文件失败 88";
+            qDebug() << "只读方式打开文件失败 333";
         }
 
         //提示文件打开的路径
         ui->Messages_QTE->append(filePath);
-
+        //关闭文件选择按键，开启发送按键
         ui->Select_PBT->setEnabled(false);
         ui->Send_PBT->setEnabled(true);
 
+        //读取文件原始数据，并且以二位16进制形式打印出来
         QDataStream dataStream(&file);
-
         memset(fileAllbuf, 0, fileSize);
         dataStream.readRawData(fileAllbuf, fileSize);
-
         //qDebug()输出存在char[],以16进制的方式
         QString strALL;
         for(quint64 i = 0; i < fileSize; i++)
@@ -286,7 +351,7 @@ void Widget::on_Select_PBT_clicked()
         }
         qDebug()<<strALL;
 
-
+        //打印文件发送信息
         packetNum = fileSize/packetSize + 1;
         lastpacketSize = fileSize%packetSize;
         strALL.clear();
@@ -300,14 +365,12 @@ void Widget::on_Select_PBT_clicked()
         strALL += QString::asprintf("%d",(qint16)lastpacketSize);
         ui->Messages_QTE->append(strALL);
 
-        fileRead_flag = true;
         file.close();
         ui->Messages_QTE->append("文件读取完成");
-
     }
     else
     {
-        qDebug() << "选择文件路径出错 99";
+        qDebug() << "选择文件路径出错 323";
         file.close();
     }
 
@@ -316,36 +379,7 @@ void Widget::on_Select_PBT_clicked()
 
 void Widget::on_Send_PBT_clicked()
 {
-//    startFrame[0] = Ymodem_SOH;
-//    startFrame[1] = 0x00;
-//    startFrame[2] = 0xFF;
-
-//    //将QString转换成字符数组char[];
-//    memcpy(startFrame+3, fileName.toLatin1().data(), fileName.size()+1);
-
-//    //文件大小，占据8字节，
-//    *(quint64*)(&startFrame[3+fileName.size()+1]) = fileSize;
-//    qDebug()<<*(quint64*)(&startFrame[3+fileName.size()+1]);
-
-//    startFrame[3+fileName.size()+1+8] = 0x00;
-
-//    for(int i = 0; (3+fileName.size()+1+8+i)<133; i++)
-//    {
-//        startFrame[3+fileName.size()+1+8+i] = 0x00;
-//    }
-
-//    //计算CRC
-//    width_t crc16;
-//    crc16 = crcCompute((unsigned char *)startFrame+3,128);
-//    qDebug()<<crc16;
-
-//    //写入CRC并发送
-//    startFrame[131] = crc16 >> 8;
-//    startFrame[132] = crc16;
-//    tcpSocket->write(startFrame, 133);
-//    YgetC_flag = 0;
-//    YgetACK_flag = 0;
-
+    //开启定时器准备好开始发送文件信息
     timerPacketSend.start(100);
 
 }
@@ -469,4 +503,117 @@ width_t crcCompute(unsigned char * message, unsigned int nBytes)
     }
     /* The final remainder is the CRC result. */
     return (remainder ^ FINAL_XOR_VALUE);
+}
+
+void Widget::on_clc1_PBT_clicked()
+{
+    ui->Messages_QTE->clear();
+}
+
+void Widget::on_clc2_PBT_clicked()
+{
+    ui->revMessage_QTE->clear();
+}
+
+//进入设备配置模式
+void Widget::on_setting_PBT_clicked()
+{
+
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        commandFrame[0] = 0x01;
+        commandFrame[1] = 0xAB;
+        commandFrame[2] = 0xCD;
+        commandFrame[3] = 0x01;
+        for( int i = 0; i < 10; i++ )
+        {
+            commandFrame[i+4] = 0x00;
+        }
+        tcpSocket->write(commandFrame, 14);
+    }
+    else
+    {
+
+    }
+}
+//返回上一级
+void Widget::on_goBack_PBT_clicked()
+{
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        commandFrame[0] = 0x01;
+        commandFrame[1] = 0xAB;
+        commandFrame[2] = 0xCD;
+        commandFrame[3] = 0x07;
+        for( int i = 0; i < 10; i++ )
+        {
+            commandFrame[i+4] = 0x00;
+        }
+        tcpSocket->write(commandFrame, 14);
+    }
+    else
+    {
+
+    }
+}
+
+void Widget::on_upgrade_PBT_clicked()
+{
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        commandFrame[0] = 0x01;
+        commandFrame[1] = 0xAB;
+        commandFrame[2] = 0xCD;
+        commandFrame[3] = 0x02;
+        for( int i = 0; i < 10; i++ )
+        {
+            commandFrame[i+4] = 0x00;
+        }
+        tcpSocket->write(commandFrame, 14);
+    }
+    else
+    {
+
+    }
+}
+
+void Widget::on_readDev_PBT_clicked()
+{
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        commandFrame[0] = 0x01;
+        commandFrame[1] = 0xAB;
+        commandFrame[2] = 0xCD;
+        commandFrame[3] = 0x06;
+        for( int i = 0; i < 10; i++ )
+        {
+            commandFrame[i+4] = 0x00;
+        }
+        tcpSocket->write(commandFrame, 14);
+    }
+    else
+    {
+
+    }
+}
+
+void Widget::on_changeDev_PBT_clicked()
+{
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        commandFrame[0] = 0x01;
+        commandFrame[1] = 0xAB;
+        commandFrame[2] = 0xCD;
+        commandFrame[3] = 0x05;
+        QString str;
+        str = ui->Dev_IP->text();
+        qDebug()<<str.size();
+        for(int i = 0; i < str.size(); i++)
+        {
+            qDebug()<<str[i];
+        }
+
+         qDebug()<<str.section(".",1,1).toUInt();
+    }
+
 }
