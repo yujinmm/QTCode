@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>466</width>
-    <height>412</height>
+    <width>464</width>
+    <height>465</height>
    </rect>
   </property>
   <property name="font">
@@ -22,7 +22,7 @@
    <property name="geometry">
     <rect>
      <x>10</x>
-     <y>360</y>
+     <y>420</y>
      <width>121</width>
      <height>40</height>
     </rect>
@@ -350,8 +350,8 @@
   <widget class="QPushButton" name="upgrade_PBT">
    <property name="geometry">
     <rect>
-     <x>130</x>
-     <y>330</y>
+     <x>20</x>
+     <y>360</y>
      <width>131</width>
      <height>31</height>
     </rect>
@@ -387,8 +387,8 @@
   <widget class="QPushButton" name="goto_PBT">
    <property name="geometry">
     <rect>
-     <x>130</x>
-     <y>360</y>
+     <x>260</x>
+     <y>330</y>
      <width>71</width>
      <height>31</height>
     </rect>
@@ -437,6 +437,16 @@
    </property>
    <property name="text">
     <string>信息修改</string>
+   </property>
+  </widget>
+  <widget class="QComboBox" name="comboBox">
+   <property name="geometry">
+    <rect>
+     <x>370</x>
+     <y>400</y>
+     <width>81</width>
+     <height>22</height>
+    </rect>
    </property>
   </widget>
  </widget>

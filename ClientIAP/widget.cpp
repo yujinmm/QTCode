@@ -12,11 +12,18 @@ Widget::Widget(QWidget *parent)
     , ui(new Ui::Widget)
 {
     ui->setupUi(this);
-    this->setFixedSize(450,409);
+    this->setFixedSize(464,465);
 
     //初始化CRC
     crcInit();
 
+    //
+    QStringList strlist;
+    strlist<<"      ";
+    strlist<<"IAP模式";
+    strlist<<"APP模式";
+
+    ui->comboBox->addItems(strlist);
     //防止野指针
     tcpSocket = NULL;
 
@@ -81,6 +88,10 @@ Widget::Widget(QWidget *parent)
                     {
                         ui->label_DevS->setText("顶层模式");
                         devstage = 1;
+                        ui->Dev_IP->clear();
+                        ui->Dev_Gateway->clear();
+                        ui->Dev_Mac->clear();
+                        ui->comboBox->setCurrentIndex(0);
                     }
                     else if( array.at(0) == Ymodem_Setting )
                     {
@@ -121,6 +132,15 @@ Widget::Widget(QWidget *parent)
                             ui->Dev_IP->setText(QString("%1.%2.%3.%4").arg(local_ip[0]).arg(local_ip[1]).arg(local_ip[2]).arg(local_ip[3]));
                             ui->Dev_Gateway->setText(QString("%1.%2.%3.%4").arg(gateway[0]).arg(gateway[1]).arg(gateway[2]).arg(gateway[3]));
                             ui->Dev_Mac->setText(QString("%1.%2.%3.%4.%5.%6").arg(mac[0]).arg(mac[1]).arg(mac[2]).arg(mac[3]).arg(mac[4]).arg(mac[5]));
+                            if( commandRXframe[5] == 0x10 && commandRXframe[4] == 0x00)
+                            {
+                                ui->comboBox->setCurrentIndex(1);
+
+                            }
+                            else if( commandRXframe[5] == 0x01 && commandRXframe[4] == 0x00 )
+                            {
+                                 ui->comboBox->setCurrentIndex(2);
+                            }
                         }
                     }
 
@@ -607,13 +627,108 @@ void Widget::on_changeDev_PBT_clicked()
         commandFrame[3] = 0x05;
         QString str;
         str = ui->Dev_IP->text();
-        qDebug()<<str.size();
-        for(int i = 0; i < str.size(); i++)
+
+        local_ip[2] = str.section(".",2,2).toUInt();
+        local_ip[3] = str.section(".",3,3).toUInt();
+
+        str.clear();
+        str = ui->Dev_Gateway->text();
+        gateway[2] = str.section(".",2,2).toUInt();
+        gateway[3] = str.section(".",3,3).toUInt();
+
+        str.clear();
+        str = ui->Dev_Mac->text();
+        mac[4] = str.section(".",4,4).toUInt();
+        mac[5] = str.section(".",5,5).toUInt();
+
+        qDebug() << QString("%1.%2.%3.%4").arg(local_ip[0]).arg(local_ip[1]).arg(local_ip[2]).arg(local_ip[3]);
+        qDebug() << QString("%1.%2.%3.%4").arg(gateway[0]).arg(gateway[1]).arg(gateway[2]).arg(gateway[3]);
+        qDebug() << QString("%1.%2.%3.%4.%5.%6").arg(mac[0]).arg(mac[1]).arg(mac[2]).arg(mac[3]).arg(mac[4]).arg(mac[5]);
+
+        if( ui->comboBox->currentIndex() == 1 )
         {
-            qDebug()<<str[i];
+            commandFrame[4] = 0x00;
+            commandFrame[5] = 0x10;
+
+            commandFrame[6] = local_ip[2];
+            commandFrame[7] = local_ip[3];
+
+            commandFrame[8] = gateway[2];
+            commandFrame[9] = gateway[3];
+
+            commandFrame[10] = mac[4];
+            commandFrame[11] = mac[5];
+
+            width_t crc16 = 0;
+            crc16 = crcCompute((unsigned char *)commandFrame+4,8);
+
+            commandFrame[12] = crc16 >> 8;
+            commandFrame[13] = crc16;
+            tcpSocket->write(commandFrame, 14);
+        }
+        else if( ui->comboBox->currentIndex() == 2 )
+        {
+            commandFrame[4] = 0x00;
+            commandFrame[5] = 0x01;
+
+            commandFrame[6] = local_ip[2];
+            commandFrame[7] = local_ip[3];
+
+            commandFrame[8] = gateway[2];
+            commandFrame[9] = gateway[3];
+
+            commandFrame[10] = mac[4];
+            commandFrame[11] = mac[5];
+
+            width_t crc16 = 0;
+            crc16 = crcCompute((unsigned char *)commandFrame+4,8);
+
+            commandFrame[12] = crc16 >> 8;
+            commandFrame[13] = crc16;
+            tcpSocket->write(commandFrame, 14);
         }
 
-         qDebug()<<str.section(".",1,1).toUInt();
+//        commandFrame[6] = local_ip[2];
+//        commandFrame[7] = local_ip[3];
+
+//        commandFrame[8] = gateway[2];
+//        commandFrame[9] = gateway[3];
+
+//        commandFrame[10] = mac[4];
+//        commandFrame[11] = mac[5];
+
+//        width_t crc16 = 0;
+//        crc16 = crcCompute((unsigned char *)commandFrame+4,8);
+
+//        commandFrame[12] = crc16 >> 8;
+//        commandFrame[13] = crc16;
+
+//        qDebug() << QString::asprintf("0x%02X.0x%02X.0x%02X.0x%02X.0x%02X.0x%02X.%d.%d.%d.%d.%d.%d.0x%02X.0x%02X",
+//                (quint8)commandFrame[0],(quint8)commandFrame[1],(quint8)commandFrame[2],
+//                (quint8)commandFrame[3],(quint8)commandFrame[4],(quint8)commandFrame[5],
+//                (quint8)commandFrame[6],(quint8)commandFrame[7],(quint8)commandFrame[8],
+//                (quint8)commandFrame[9],(quint8)commandFrame[10],(quint8)commandFrame[11],
+//                (quint8)commandFrame[12],(quint8)commandFrame[13]                           );
     }
 
+}
+
+void Widget::on_goto_PBT_clicked()
+{
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        commandFrame[0] = 0x01;
+        commandFrame[1] = 0xAB;
+        commandFrame[2] = 0xCD;
+        commandFrame[3] = 0x03;
+        for( int i = 0; i < 10; i++ )
+        {
+            commandFrame[i+4] = 0x00;
+        }
+        tcpSocket->write(commandFrame, 14);
+    }
+    else
+    {
+
+    }
 }

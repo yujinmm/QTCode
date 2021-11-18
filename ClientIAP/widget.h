@@ -64,6 +64,8 @@ private slots:
 
     void on_changeDev_PBT_clicked();
 
+    void on_goto_PBT_clicked();
+
 private:
     Ui::Widget *ui;
 
