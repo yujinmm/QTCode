@@ -66,6 +66,12 @@ private slots:
 
     void on_goto_PBT_clicked();
 
+    void on_start_PBT_clicked();
+
+    void on_stop_PBT_clicked();
+
+    void on_rst_PBT_clicked();
+
 private:
     Ui::Widget *ui;
 

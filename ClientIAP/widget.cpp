@@ -12,7 +12,7 @@ Widget::Widget(QWidget *parent)
     , ui(new Ui::Widget)
 {
     ui->setupUi(this);
-    this->setFixedSize(464,465);
+    this->setFixedSize(471,522);
 
     //初始化CRC
     crcInit();
@@ -314,16 +314,17 @@ void Widget::on_Connect_PBT_clicked()
 
 void Widget::on_Close_PBT_clicked()
 {
-    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
-    {
+//    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+//    {
         //主动和对方断开
         tcpSocket->disconnectFromHost();
         tcpSocket->close();
-    }
-    else
-    {
-        ui->Messages_QTE->append(QString("网络状态:%1").arg(tcpSocket->state()));
-    }
+//    }
+//    else
+//    {
+//        ui->Messages_QTE->append(QString("网络状态:%1").arg(tcpSocket->state()));
+//        tcpSocket->reset();
+//    }
 }
 
 void Widget::on_Select_PBT_clicked()
@@ -721,6 +722,66 @@ void Widget::on_goto_PBT_clicked()
         commandFrame[1] = 0xAB;
         commandFrame[2] = 0xCD;
         commandFrame[3] = 0x03;
+        for( int i = 0; i < 10; i++ )
+        {
+            commandFrame[i+4] = 0x00;
+        }
+        tcpSocket->write(commandFrame, 14);
+    }
+    else
+    {
+
+    }
+}
+
+void Widget::on_start_PBT_clicked()
+{
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        commandFrame[0] = 0x01;
+        commandFrame[1] = 0xAB;
+        commandFrame[2] = 0xCD;
+        commandFrame[3] = 0x08;
+        for( int i = 0; i < 10; i++ )
+        {
+            commandFrame[i+4] = 0x00;
+        }
+        tcpSocket->write(commandFrame, 14);
+    }
+    else
+    {
+
+    }
+}
+
+void Widget::on_stop_PBT_clicked()
+{
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        commandFrame[0] = 0x01;
+        commandFrame[1] = 0xAB;
+        commandFrame[2] = 0xCD;
+        commandFrame[3] = 0x09;
+        for( int i = 0; i < 10; i++ )
+        {
+            commandFrame[i+4] = 0x00;
+        }
+        tcpSocket->write(commandFrame, 14);
+    }
+    else
+    {
+
+    }
+}
+
+void Widget::on_rst_PBT_clicked()
+{
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
+        commandFrame[0] = 0x01;
+        commandFrame[1] = 0xAB;
+        commandFrame[2] = 0xCD;
+        commandFrame[3] = 0x0A;
         for( int i = 0; i < 10; i++ )
         {
             commandFrame[i+4] = 0x00;
