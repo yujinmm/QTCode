@@ -64,7 +64,12 @@ Widget::Widget(QWidget *parent)
            {
                 //这里还存在一个问题，就是没有手动断开连接，当窗口关闭后 对象树释放socket后断开连接，还会进来一次，这是就会报错
                 ui->Messages_QTE->append("与服务器断开连接!");
+                tcpSocket->close();
+
                 ui->Select_PBT->setEnabled(false);
+                ui->Send_PBT->setEnabled(false);
+                timerPacketSend.stop();
+
                 ui->label_State->setText("未连接");
                 ui->label_DevS->setText("下位机当前状态");
                 //当网络连接状态更改，需要初始化.bin文件发送的标志位
@@ -297,7 +302,8 @@ Widget::~Widget()
 void Widget::on_Connect_PBT_clicked()
 {
     if( tcpSocket->state() == QAbstractSocket::UnconnectedState )
-    {   //获取服务器ip和端口
+    {
+        //获取服务器ip和端口
         QString ip = ui->IP_IE->text();
         //将Qstring 转换成 int
         quint16 Port = ui->Port_IE->text().toUInt();
@@ -314,17 +320,16 @@ void Widget::on_Connect_PBT_clicked()
 
 void Widget::on_Close_PBT_clicked()
 {
-//    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
-//    {
+    if( tcpSocket->state() == QAbstractSocket::ConnectedState )
+    {
         //主动和对方断开
         tcpSocket->disconnectFromHost();
         tcpSocket->close();
-//    }
-//    else
-//    {
-//        ui->Messages_QTE->append(QString("网络状态:%1").arg(tcpSocket->state()));
-//        tcpSocket->reset();
-//    }
+    }
+    else
+    {
+        ui->Messages_QTE->append(QString("网络状态:%1").arg(tcpSocket->state()));
+    }
 }
 
 void Widget::on_Select_PBT_clicked()
