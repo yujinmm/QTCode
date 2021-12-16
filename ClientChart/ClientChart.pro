@@ -18,11 +18,15 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
     datachart.cpp \
     main.cpp \
+    mythread.cpp \
+    mythreadpro.cpp \
     tcpclient.cpp \
     widget.cpp
 
 HEADERS += \
     datachart.h \
+    mythread.h \
+    mythreadpro.h \
     tcpclient.h \
     widget.h
 

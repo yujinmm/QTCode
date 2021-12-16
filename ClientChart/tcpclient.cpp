@@ -21,10 +21,10 @@ TcpClient::TcpClient(QWidget *parent) :
     connect(tcpSocket, &QTcpSocket::readyRead,
            [=]()
            {
-                //获取对方发送的内容
-                QByteArray array = tcpSocket->readAll();
-                //追加到编辑区中
-                ui->Messages_QTE->append(array.toHex());
+//                //获取对方发送的内容
+//                QByteArray array = tcpSocket->readAll();
+//                //追加到编辑区中
+//                ui->Messages_QTE->append(array.toHex());
            }
            );
 
@@ -70,3 +70,9 @@ void TcpClient::on_Messages_QTE_textChanged()
 {
     ui->Messages_QTE->moveCursor(QTextCursor::End);
 }
+
+QByteArray TcpClient::readSocket(void)
+{
+    return tcpSocket->readAll();
+}
+

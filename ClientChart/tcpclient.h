@@ -15,6 +15,10 @@ public:
     explicit TcpClient(QWidget *parent = nullptr);
     ~TcpClient();
 
+    QTcpSocket *tcpSocket;   //通信
+
+    QByteArray readSocket(void);
+
 private slots:
     void on_connect_PB_clicked();
 
@@ -27,7 +31,6 @@ private slots:
 private:
     Ui::TcpClient *ui;
 
-    QTcpSocket *tcpSocket;   //通信
 };
 
 #endif // TCPCLIENT_H

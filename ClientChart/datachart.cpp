@@ -27,7 +27,7 @@ dataChart::dataChart(QWidget *parent) :
    // Dialog *dlg = new Dialog
    // connect(widget,SIGNAL(sendY_min(QString)),this,SLOT(receiveY_min(QString)));
 
-    zhouY->setRange(1000,2000);
+    zhouY->setRange(500,1500);
 
    // qDebug ()<< _Y_max;
    // qDebug ()<< _Y_min;
